@@ -113,13 +113,26 @@ echo "=== Cursor UI Agent Starting ===" >&2
 echo "Model: $MODEL | Dir: $WORKDIR | Timeout: ${TIMEOUT}s | Review: $REVIEW_MODE" >&2
 echo "---" >&2
 
-# Execute cursor agent CLI with timeout
-timeout "$TIMEOUT" agent "${CURSOR_ARGS[@]}" "$PROMPT"
-EXIT_CODE=$?
+# Resolve timeout command: GNU timeout > gtimeout (macOS coreutils) > no timeout
+if command -v timeout >/dev/null 2>&1; then
+    TIMEOUT_CMD="timeout"
+elif command -v gtimeout >/dev/null 2>&1; then
+    TIMEOUT_CMD="gtimeout"
+else
+    TIMEOUT_CMD=""
+fi
 
-if [[ $EXIT_CODE -eq 124 ]]; then
-    echo "Error: Cursor Agent execution timed out after ${TIMEOUT}s" >&2
-    exit 124
+# Execute cursor agent CLI (with timeout if available)
+if [[ -n "$TIMEOUT_CMD" ]]; then
+    $TIMEOUT_CMD "$TIMEOUT" agent "${CURSOR_ARGS[@]}" "$PROMPT"
+    EXIT_CODE=$?
+    if [[ $EXIT_CODE -eq 124 ]]; then
+        echo "Error: Cursor Agent execution timed out after ${TIMEOUT}s" >&2
+        exit 124
+    fi
+else
+    agent "${CURSOR_ARGS[@]}" "$PROMPT"
+    EXIT_CODE=$?
 fi
 
 exit $EXIT_CODE
